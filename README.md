@@ -1,20 +1,13 @@
-# hello_app
+# A.S. Anti-Scam App
 
-A new Flutter project.
+A.S. Anti-Scam App is a security-focused application designed to help users detect and avoid malicious QR codes and scam-related links.
 
-## Getting Started
+The app allows users to scan QR codes safely and receive clear warnings before opening potentially harmful destinations.
 
-This project is a starting point for a Flutter application.
+Built with a privacy-first approach, the application performs analysis locally on the device whenever possible and does not collect unnecessary personal data.
 
-A few resources to get you started if this is your first Flutter project:
+Developed by **A.S. Cyber Intelligence Federal Inc.**, the app is part of our broader mission to improve digital safety and combat modern scam techniques.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
 ## Privacy Policy
 
-🔐 Privacy Policy for QR Anti-Scam App:  
 https://ascyberapp.github.io/as-anti-scam-app/privacy.html
