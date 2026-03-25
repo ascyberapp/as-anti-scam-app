@@ -70,8 +70,10 @@ class _HomePageState extends State<HomePage> {
             height: 300,
             child: MobileScanner(
               onDetect: (barcode, args) {
-                final String? code = barcode.rawValue;
-                _handleScan(code);
+                final List<Barcode> barcodes = capture.barcodes;
+                final String? code =
+                    barcodes.isNotEmpty ? barcodes.first.rawValue : null; 
+                 _handleScan(code);
               },
             ),
           ),
