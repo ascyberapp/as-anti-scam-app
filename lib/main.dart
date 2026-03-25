@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 // importul pentru scanner (ex: mobile_scanner)
-// import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 void main() {
   runApp(const MyApp());
@@ -65,7 +65,7 @@ class _HomePageState extends State<HomePage> {
 
           // 🔽 AICI vine camera/scanner-ul tău
           // Exemplu (decomentează dacă folosești mobile_scanner):
-          /*
+          
           SizedBox(
             height: 300,
             child: MobileScanner(
@@ -75,7 +75,7 @@ class _HomePageState extends State<HomePage> {
               },
             ),
           ),
-          */
+          
 
           const SizedBox(height: 16),
 
