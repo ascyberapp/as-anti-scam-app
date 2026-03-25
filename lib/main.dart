@@ -69,7 +69,7 @@ class _HomePageState extends State<HomePage> {
           SizedBox(
             height: 300,
             child: MobileScanner(
-              onDetect: (barcode, args) {
+              onDetect: (capture) {
                 final List<Barcode> barcodes = capture.barcodes;
                 final String? code =
                     barcodes.isNotEmpty ? barcodes.first.rawValue : null; 
@@ -78,7 +78,6 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           
-
           const SizedBox(height: 16),
 
           // 🔥 UI corect (nu mai arată risc fără scan)
