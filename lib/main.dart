@@ -1,53 +1,125 @@
 import 'package:flutter/material.dart';
-// importul pentru scanner (ex: mobile_scanner)
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 void main() {
   runApp(const MyApp());
 }
 
-// ---------------- APP ----------------
+enum RiskLevel { low, medium, high }
+
+class ScanResult {
+  final RiskLevel level;
+  final int score;
+  final String message;
+  final String url;
+  final List<String> details;
+
+  ScanResult({
+    required this.level,
+    required this.score,
+    required this.message,
+    required this.url,
+    required this.details,
+  });
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'A.S. Anti-Scam',
-      theme: ThemeData.dark(),
-      home: const HomePage(),
+      home: ScannerPage(),
     );
   }
 }
 
-// ---------------- UI PAGE ----------------
-
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+class ScannerPage extends StatefulWidget {
+  const ScannerPage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  State<ScannerPage> createState() => _ScannerPageState();
 }
 
-class _HomePageState extends State<HomePage> {
-  AnalysisResult? result;
+class _ScannerPageState extends State<ScannerPage> {
+  ScanResult? result;
+  bool isAnalyzing = false;
 
-  // 🔥 FIX UI: handler corect
-  void _handleScan(String? data) {
-    // ❌ nimic detectat → reset UI
-    if (data == null || data.isEmpty) {
-      setState(() {
-        result = null;
-      });
+  Future<void> _handleScan(String? code) async {
+    if (code == null || isAnalyzing) return;
+
+    setState(() => isAnalyzing = true);
+
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    final uri = Uri.tryParse(code);
+
+    if (uri == null || !uri.hasScheme) {
+      _setResult(ScanResult(
+        level: RiskLevel.high,
+        score: 90,
+        message: "Invalid QR",
+        url: code,
+        details: ["Invalid link"],
+      ));
       return;
     }
 
-    final analysis = analyzeInput(data);
+    int score = 0;
+    List<String> details = [];
 
+    if (uri.scheme != "https") {
+      score += 30;
+      details.add("No HTTPS");
+    } else {
+      details.add("Secure HTTPS");
+    }
+
+    if (uri.host.contains("login") ||
+        uri.host.contains("verify") ||
+        uri.host.contains("secure")) {
+      score += 40;
+      details.add("Suspicious keywords");
+    }
+
+    if (uri.host.length > 25) {
+      score += 15;
+      details.add("Long domain");
+    }
+
+    if (uri.host.contains("-")) {
+      score += 10;
+      details.add("Hyphen domain");
+    }
+
+    RiskLevel level;
+    String message;
+
+    if (score < 30) {
+      level = RiskLevel.low;
+      message = "Safe";
+    } else if (score < 70) {
+      level = RiskLevel.medium;
+      message = "Be careful";
+    } else {
+      level = RiskLevel.high;
+      message = "High risk";
+    }
+
+    _setResult(ScanResult(
+      level: level,
+      score: score,
+      message: message,
+      url: code,
+      details: details,
+    ));
+  }
+
+  void _setResult(ScanResult res) {
     setState(() {
-      result = analysis;
+      result = res;
+      isAnalyzing = false;
     });
   }
 
@@ -55,60 +127,38 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: const Text('A.S. Anti-Scam App'),
-        centerTitle: true,
-      ),
-      body: Column(
+      body: Stack(
         children: [
-          const SizedBox(height: 16),
+          MobileScanner(
+            onDetect: (capture) {
+              final code = capture.barcodes.isNotEmpty
+                  ? capture.barcodes.first.rawValue
+                  : null;
 
-          // 🔽 AICI vine camera/scanner-ul tău
-          // Exemplu (decomentează dacă folosești mobile_scanner):
-          
-          SizedBox(
-            height: 300,
-            child: MobileScanner(
-              onDetect: (capture) {
-                final List<Barcode> barcodes = capture.barcodes;
-                final String? code =
-                    barcodes.isNotEmpty ? barcodes.first.rawValue : null; 
-                 _handleScan(code);
-              },
-            ),
+              _handleScan(code);
+            },
           ),
-          
-          const SizedBox(height: 16),
 
-          // 🔥 UI corect (nu mai arată risc fără scan)
-          Expanded(
-            child: Center(
-              child: result == null || result!.level == RiskLevel.unknown
-                  ? const Text(
-                      "Scan a QR code to begin",
-                      style: TextStyle(color: Colors.white70, fontSize: 16),
-                    )
-                  : _ResultCard(result: result!),
+          const ScannerOverlay(),
+
+          if (isAnalyzing)
+            const Center(
+              child: CircularProgressIndicator(
+                color: Colors.greenAccent,
+              ),
             ),
-          ),
+
+          _buildBottomPanel(),
         ],
       ),
     );
   }
-}
 
-// ---------------- RESULT UI ----------------
+  Widget _buildBottomPanel() {
+    if (result == null) return const SizedBox();
 
-class _ResultCard extends StatelessWidget {
-  final AnalysisResult result;
-
-  const _ResultCard({required this.result});
-
-  @override
-  Widget build(BuildContext context) {
     Color color;
-
-    switch (result.level) {
+    switch (result!.level) {
       case RiskLevel.low:
         color = Colors.green;
         break;
@@ -118,160 +168,86 @@ class _ResultCard extends StatelessWidget {
       case RiskLevel.high:
         color = Colors.red;
         break;
-      case RiskLevel.unknown:
-        color = Colors.grey;
-        break;
     }
 
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            result.title,
-            style: TextStyle(
-              color: color,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            result.details,
-            style: const TextStyle(color: Colors.white70),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 10),
-          if (result.url.isNotEmpty)
+    return Positioned(
+      bottom: 25,
+      left: 16,
+      right: 16,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.85),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color, width: 1.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Text(
-              result.url,
-              style: const TextStyle(color: Colors.blueAccent),
+              "${result!.message} (${result!.score})",
+              style: TextStyle(color: color, fontSize: 13),
             ),
-        ],
+            const SizedBox(height: 4),
+            Text(
+              result!.url,
+              style:
+                  const TextStyle(color: Colors.blueAccent, fontSize: 11),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-// ---------------- ANALYZER ----------------
+class ScannerOverlay extends StatefulWidget {
+  const ScannerOverlay({super.key});
 
-enum RiskLevel { low, medium, high, unknown }
-
-extension on RiskLevel {
-  String get label {
-    switch (this) {
-      case RiskLevel.low:
-        return 'LOW';
-      case RiskLevel.medium:
-        return 'MEDIUM';
-      case RiskLevel.high:
-        return 'HIGH';
-      case RiskLevel.unknown:
-        return 'UNKNOWN';
-    }
-  }
+  @override
+  State<ScannerOverlay> createState() => _ScannerOverlayState();
 }
 
-class AnalysisResult {
-  final RiskLevel level;
-  final String title;
-  final String details;
-  final String url;
+class _ScannerOverlayState extends State<ScannerOverlay>
+    with SingleTickerProviderStateMixin {
+  late AnimationController controller;
+  late Animation<double> animation;
 
-  const AnalysisResult({
-    required this.level,
-    required this.title,
-    required this.details,
-    required this.url,
-  });
-}
+  @override
+  void initState() {
+    super.initState();
 
-// 🔥 ANALYZER FIX COMPLET
-AnalysisResult analyzeInput(String input) {
-  final detectedUrl = _extractUrl(input);
+    controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
 
-  // ❌ fără QR valid → NU arătăm risc
-  if (detectedUrl.isEmpty) {
-    return const AnalysisResult(
-      level: RiskLevel.unknown,
-      title: 'No valid QR code detected',
-      details: 'Scan a valid QR code or QR link to analyze risk.',
-      url: '',
+    animation = Tween<double>(begin: 100, end: 400).animate(controller);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (_, __) {
+        return Positioned(
+          top: animation.value,
+          left: 40,
+          right: 40,
+          child: Container(
+            height: 2,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  Colors.greenAccent,
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
-
-  int score = 0;
-
-  final uri = Uri.tryParse(detectedUrl);
-
-  if (uri == null) {
-    score += 5;
-  } else {
-    if (uri.scheme != 'https') score += 2;
-
-    if (uri.host.contains('bit.ly') ||
-        uri.host.contains('tinyurl') ||
-        uri.host.contains('goo.gl')) {
-      score += 3;
-    }
-
-    if (uri.host.contains('-') || uri.host.contains('secure-login')) {
-      score += 2;
-    }
-  }
-
-  if (score >= 6) {
-    return AnalysisResult(
-      level: RiskLevel.high,
-      title: 'HIGH RISK — do not open.',
-      details:
-          'This link shows strong scam signals. Avoid entering any personal data.',
-      url: detectedUrl,
-    );
-  }
-
-  if (score >= 3) {
-    return AnalysisResult(
-      level: RiskLevel.medium,
-      title: 'MEDIUM RISK — proceed with caution.',
-      details:
-          'This link shows warning signals. Double-check the domain.',
-      url: detectedUrl,
-    );
-  }
-
-  return AnalysisResult(
-    level: RiskLevel.low,
-    title: 'LOW RISK — looks OK, but stay alert.',
-    details:
-        'No strong risk signals detected by offline checks. Still verify the domain.',
-    url: detectedUrl,
-  );
-}
-
-// 🔥 extract URL FIX
-String _extractUrl(String input) {
-  if (input.isEmpty) return '';
-
-  final direct = Uri.tryParse(input);
-  if (direct != null &&
-      (direct.scheme == 'http' || direct.scheme == 'https')) {
-    return input;
-  }
-
-  final re = RegExp(r'(https?:\/\/[^\s]+)', caseSensitive: false);
-  final match = re.firstMatch(input);
-
-  if (match != null) {
-    return match.group(0) ?? '';
-  }
-
-  return '';
 }
