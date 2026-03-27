@@ -25,6 +25,7 @@ flutter:
 
   assets:
     - assets/icons/icon.png
+    - assets/beep.mp3
 
 flutter_launcher_icons:
   image_path: assets/icons/icon.png
