@@ -1,253 +1,116 @@
-import 'package:flutter/material.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 
-void main() {
-  runApp(const MyApp());
-}
+import sys
+import os 
 
-enum RiskLevel { low, medium, high }
+from PySide6.QtWidgets import (
+    QApplication, QWidget, QVBoxLayout,
+    QPushButton, QTextEdit, QLabel, QSplashScreen
+)
 
-class ScanResult {
-  final RiskLevel level;
-  final int score;
-  final String message;
-  final String url;
-  final List<String> details;
+from PySide6.QtGui import QPixmap, QIcon 
+from PySide6.QtCore import QTimer
 
-  ScanResult({
-    required this.level,
-    required this.score,
-    required this.message,
-    required this.url,
-    required this.details,
-  });
-}
+from analyzer import analyze
+def resource_path(relative_path):
+    base_path = getattr(sys, "_MEIPASS", os.path.abspath("."))
+    return os.path.join(base_path, relative_path)
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    return const MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: ScannerPage(),
-    );
-  }
-}
 
-class ScannerPage extends StatefulWidget {
-  const ScannerPage({super.key});
+class QRApp(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("QR Anti-Scam")
+        self.setWindowIcon(QIcon(resource_path("assets/icon.png")))
+        self.setMinimumWidth(420)
 
-  @override
-  State<ScannerPage> createState() => _ScannerPageState();
-}
+        layout = QVBoxLayout()
 
-class _ScannerPageState extends State<ScannerPage> {
-  ScanResult? result;
-  bool isAnalyzing = false;
+        self.info = QLabel("Paste QR content or link below:")
+        layout.addWidget(self.info)
 
-  Future<void> _handleScan(String? code) async {
-    if (code == null || isAnalyzing) return;
+        self.input = QTextEdit()
+        self.input.setPlaceholderText("https://example.com")
+        layout.addWidget(self.input)
 
-    setState(() => isAnalyzing = true);
+        self.scan_btn = QPushButton("Analyze")
+        self.scan_btn.clicked.connect(self.run_analysis)
+        layout.addWidget(self.scan_btn)
 
-    await Future.delayed(const Duration(milliseconds: 500));
+        self.result = QLabel("")
+        self.result.setWordWrap(True)
+        layout.addWidget(self.result)
 
-    final uri = Uri.tryParse(code);
+        self.setLayout(layout)
+        self.apply_dark_theme()
 
-    if (uri == null || !uri.hasScheme) {
-      _setResult(ScanResult(
-        level: RiskLevel.high,
-        score: 90,
-        message: "Invalid QR",
-        url: code,
-        details: ["Invalid link"],
-      ));
-      return;
-    }
+    def run_analysis(self):
+        text = self.input.toPlainText().strip()
+        if not text:
+            self.result.setText("")
+            return
 
-    int score = 0;
-    List<String> details = [];
+        result = analyze(text)
 
-    if (uri.scheme != "https") {
-      score += 30;
-      details.add("No HTTPS");
-    } else {
-      details.add("Secure HTTPS");
-    }
+        verdict = result["verdict"]
+        reasons_list = result.get("reasons", [])
+        reasons =  "<br>• ".join(reasons_list) if reasons_list else ""
+        score = result.get("score", 0)
 
-    if (uri.host.contains("login") ||
-        uri.host.contains("verify") ||
-        uri.host.contains("secure")) {
-      score += 40;
-      details.add("Suspicious keywords");
-    }
+        # IMPORTANT: cheile trebuie să fie EXACT ca verdict-ul returnat din analyzer.py
+        color = {
+            "SAFE": "#00ff9c",
+            "LOW RISK": "#00ff9c",
+            "SUSPICIOUS": "#ffcc00",
+            "DANGEROUS": "#ff4c4c",
+        }.get(verdict, "#e6e6e6")
 
-    if (uri.host.length > 25) {
-      score += 15;
-      details.add("Long domain");
-    }
+        self.result.setText(
+            f"<div style='margin-top:10px;'>"
+            f"<h2 style='color:{color};'>{verdict}</h2>"
+            f"<p style='margin:0; opacity:0.9;'><b>Score:</b> {score}</p>"
+            f"<b>Details:</b>{reasons}"
+            f"</div>"
+        )
 
-    if (uri.host.contains("-")) {
-      score += 10;
-      details.add("Hyphen domain");
-    }
 
-    RiskLevel level;
-    String message;
 
-    if (score < 30) {
-      level = RiskLevel.low;
-      message = "Safe";
-    } else if (score < 70) {
-      level = RiskLevel.medium;
-      message = "Be careful";
-    } else {
-      level = RiskLevel.high;
-      message = "High risk";
-    }
 
-    _setResult(ScanResult(
-      level: level,
-      score: score,
-      message: message,
-      url: code,
-      details: details,
-    ));
-  }
+    def apply_dark_theme(self):
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #0b0b0f;
+                color: #e6e6e6;
+                font-size: 14px;
+            }
+            QPushButton {
+                background-color: #1a1a22;
+                padding: 10px;
+                border-radius: 6px;
+            }
+            QTextEdit {
+                background-color: #111118;
+                border: 1px solid #222;
+            }
+        """)
 
-  void _setResult(ScanResult res) {
-    setState(() {
-      result = res;
-      isAnalyzing = false;
-    });
-  }
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          MobileScanner(
-            onDetect: (capture) {
-              final code = capture.barcodes.isNotEmpty
-                  ? capture.barcodes.first.rawValue
-                  : null;
+    # Splash screen
+    splash_pix = QPixmap(resource_path("assets/splash.png"))  # imaginea ta
+    splash = QSplashScreen(splash_pix)
+    splash.show()
 
-              _handleScan(code);
-            },
-          ),
+    # Fereastra principală
+    window = QRApp()
 
-          const ScannerOverlay(),
+    # După 1.5 secunde se închide splash-ul și apare aplicația
+    def show_main():
+        window.show()
+        splash.finish(window)
 
-          if (isAnalyzing)
-            const Center(
-              child: CircularProgressIndicator(
-                color: Colors.greenAccent,
-              ),
-            ),
+    QTimer.singleShot(2000, show_main)
 
-          _buildBottomPanel(),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildBottomPanel() {
-    if (result == null) return const SizedBox();
-
-    Color color;
-    switch (result!.level) {
-      case RiskLevel.low:
-        color = Colors.green;
-        break;
-      case RiskLevel.medium:
-        color = Colors.orange;
-        break;
-      case RiskLevel.high:
-        color = Colors.red;
-        break;
-    }
-
-    return Positioned(
-      bottom: 25,
-      left: 16,
-      right: 16,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.85),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color, width: 1.5),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "${result!.message} (${result!.score})",
-              style: TextStyle(color: color, fontSize: 13),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              result!.url,
-              style:
-                  const TextStyle(color: Colors.blueAccent, fontSize: 11),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class ScannerOverlay extends StatefulWidget {
-  const ScannerOverlay({super.key});
-
-  @override
-  State<ScannerOverlay> createState() => _ScannerOverlayState();
-}
-
-class _ScannerOverlayState extends State<ScannerOverlay>
-    with SingleTickerProviderStateMixin {
-  late AnimationController controller;
-  late Animation<double> animation;
-
-  @override
-  void initState() {
-    super.initState();
-
-    controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
-
-    animation = Tween<double>(begin: 100, end: 400).animate(controller);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (_, __) {
-        return Positioned(
-          top: animation.value,
-          left: 40,
-          right: 40,
-          child: Container(
-            height: 2,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.transparent,
-                  Colors.greenAccent,
-                  Colors.transparent,
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
+    sys.exit(app.exec())
