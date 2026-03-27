@@ -77,10 +77,14 @@ class _ScannerPageState extends State<ScannerPage>
       body: Stack(
         children: [
           MobileScanner(
-            onDetect: (barcode, args) {
-              final String? code = barcode.rawValue;
-              if (code != null) {
-                analyze(code);
+            onDetect: (capture) {
+              final List<Barcode> barcodes = capture.barcodes;
+              
+              if (barcodes.isNotEmpty) {
+                final String? code = barcodes.first.rawValue;
+
+                if ( code !=null) { 
+                  analyze(code);
               }
             },
           ),
