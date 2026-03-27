@@ -85,9 +85,10 @@ class _ScannerPageState extends State<ScannerPage>
 
                 if ( code !=null) { 
                   analyze(code);
-              }
+                }
+              }  
             },
-          ),
+          ),  
 
           AnimatedBuilder(
             animation: _animation,
