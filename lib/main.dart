@@ -1,116 +1,125 @@
+import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
-import sys
-import os 
+void main() {
+  runApp(const MyApp());
+}
 
-from PySide6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout,
-    QPushButton, QTextEdit, QLabel, QSplashScreen
-)
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
-from PySide6.QtGui import QPixmap, QIcon 
-from PySide6.QtCore import QTimer
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: ScannerPage(),
+    );
+  }
+}
 
-from analyzer import analyze
-def resource_path(relative_path):
-    base_path = getattr(sys, "_MEIPASS", os.path.abspath("."))
-    return os.path.join(base_path, relative_path)
+class ScannerPage extends StatefulWidget {
+  const ScannerPage({super.key});
 
+  @override
+  State<ScannerPage> createState() => _ScannerPageState();
+}
 
+class _ScannerPageState extends State<ScannerPage>
+    with SingleTickerProviderStateMixin {
+  String resultText = "Scan a QR code";
+  Color resultColor = Colors.white;
 
-class QRApp(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("QR Anti-Scam")
-        self.setWindowIcon(QIcon(resource_path("assets/icon.png")))
-        self.setMinimumWidth(420)
+  late AnimationController _controller;
+  late Animation<double> _animation;
 
-        layout = QVBoxLayout()
+  @override
+  void initState() {
+    super.initState();
 
-        self.info = QLabel("Paste QR content or link below:")
-        layout.addWidget(self.info)
+    _controller =
+        AnimationController(vsync: this, duration: const Duration(seconds: 2))
+          ..repeat(reverse: true);
 
-        self.input = QTextEdit()
-        self.input.setPlaceholderText("https://example.com")
-        layout.addWidget(self.input)
+    _animation =
+        Tween<double>(begin: 0, end: 300).animate(_controller);
+  }
 
-        self.scan_btn = QPushButton("Analyze")
-        self.scan_btn.clicked.connect(self.run_analysis)
-        layout.addWidget(self.scan_btn)
+  void analyze(String code) {
+    int score = code.length % 100;
 
-        self.result = QLabel("")
-        self.result.setWordWrap(True)
-        layout.addWidget(self.result)
+    String verdict;
+    Color color;
 
-        self.setLayout(layout)
-        self.apply_dark_theme()
+    if (score < 20) {
+      verdict = "SAFE";
+      color = Colors.green;
+    } else if (score < 50) {
+      verdict = "LOW RISK";
+      color = Colors.lightGreen;
+    } else if (score < 80) {
+      verdict = "SUSPICIOUS";
+      color = Colors.orange;
+    } else {
+      verdict = "DANGEROUS";
+      color = Colors.red;
+    }
 
-    def run_analysis(self):
-        text = self.input.toPlainText().strip()
-        if not text:
-            self.result.setText("")
-            return
+    setState(() {
+      resultText = "$verdict • Score: $score";
+      resultColor = color;
+    });
+  }
 
-        result = analyze(text)
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          MobileScanner(
+            onDetect: (barcode, args) {
+              final String? code = barcode.rawValue;
+              if (code != null) {
+                analyze(code);
+              }
+            },
+          ),
 
-        verdict = result["verdict"]
-        reasons_list = result.get("reasons", [])
-        reasons =  "<br>• ".join(reasons_list) if reasons_list else ""
-        score = result.get("score", 0)
+          AnimatedBuilder(
+            animation: _animation,
+            builder: (_, __) {
+              return Positioned(
+                top: _animation.value,
+                left: 0,
+                right: 0,
+                child: Container(
+                  height: 2,
+                  color: Colors.greenAccent,
+                ),
+              );
+            },
+          ),
 
-        # IMPORTANT: cheile trebuie să fie EXACT ca verdict-ul returnat din analyzer.py
-        color = {
-            "SAFE": "#00ff9c",
-            "LOW RISK": "#00ff9c",
-            "SUSPICIOUS": "#ffcc00",
-            "DANGEROUS": "#ff4c4c",
-        }.get(verdict, "#e6e6e6")
-
-        self.result.setText(
-            f"<div style='margin-top:10px;'>"
-            f"<h2 style='color:{color};'>{verdict}</h2>"
-            f"<p style='margin:0; opacity:0.9;'><b>Score:</b> {score}</p>"
-            f"<b>Details:</b>{reasons}"
-            f"</div>"
-        )
-
-
-
-
-    def apply_dark_theme(self):
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #0b0b0f;
-                color: #e6e6e6;
-                font-size: 14px;
-            }
-            QPushButton {
-                background-color: #1a1a22;
-                padding: 10px;
-                border-radius: 6px;
-            }
-            QTextEdit {
-                background-color: #111118;
-                border: 1px solid #222;
-            }
-        """)
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-
-    # Splash screen
-    splash_pix = QPixmap(resource_path("assets/splash.png"))  # imaginea ta
-    splash = QSplashScreen(splash_pix)
-    splash.show()
-
-    # Fereastra principală
-    window = QRApp()
-
-    # După 1.5 secunde se închide splash-ul și apare aplicația
-    def show_main():
-        window.show()
-        splash.finish(window)
-
-    QTimer.singleShot(2000, show_main)
-
-
-    sys.exit(app.exec())
+          Positioned(
+            bottom: 50,
+            left: 20,
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: resultColor),
+              ),
+              child: Text(
+                resultText,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: resultColor, fontSize: 16),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
